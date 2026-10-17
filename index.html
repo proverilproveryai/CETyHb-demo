@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<!--
+  Local stand-in for the Art Blocks generator page (vanilla JS project).
+  Mirrors its head styles and the way it declares tokenData, then loads
+  dist/artblocks.js. Serve the repo root and open:
+
+    tools/artblocks-harness.html                          random token
+    tools/artblocks-harness.html?hash=0x…&tokenId=42      specific token
+
+  window.__abPreviewCalls counts $renderPreview() calls (must end up at 1).
+-->
+<html>
+<head>
+<meta charset="utf-8">
+<title>CETyHb</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style type="text/css">
+  html { height: 100%; }
+  body { min-height: 100%; margin: 0; padding: 0; }
+  canvas { padding: 0; margin: auto; display: block; position: absolute; top: 0; bottom: 0; left: 0; right: 0; }
+</style>
+</head>
+<body>
+<script>
+  (function () {
+    var q = new URLSearchParams(location.search);
+    var hash = q.get('hash');
+    if (!hash) {
+      var b = new Uint8Array(32); crypto.getRandomValues(b);
+      hash = '0x' + Array.from(b, function (x) { return x.toString(16).padStart(2, '0'); }).join('');
+    }
+    window.__abToken = { hash: hash, tokenId: String(q.get('tokenId') || '0') };
+  })();
+  window.__abPreviewCalls = 0;
+  window.$renderPreview = function () { window.__abPreviewCalls++; console.log('$renderPreview', window.__abPreviewCalls); };
+</script>
+<script>let tokenData = window.__abToken;</script>
+<script src="artblocks.js"></script>
+</body>
+</html>
