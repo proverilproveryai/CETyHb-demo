@@ -3,12 +3,13 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>CETyHb — mint</title>
+<title>CETyHb</title>
 <meta name="description" content="CETyHb: a fully on-chain long-form generative series on Ethereum, inspired by the Soviet ternary computer Setun.">
 <style>
 @font-face { font-family: 'VT323'; src: url('VT323-subset.woff2') format('woff2'); }
 :root { --fg: #FFB000; --bg: #0A0600; --dim: #FFB00080; --line: #FFB00066; }
 * { box-sizing: border-box; margin: 0; padding: 0; }
+[hidden] { display: none !important; }
 html, body { background: var(--bg); color: var(--fg); font: 20px/1.4 'VT323', ui-monospace, monospace; }
 main { max-width: 760px; margin: 0 auto; padding: 24px 16px 48px; }
 header { display: flex; justify-content: space-between; align-items: baseline; border: 3px double var(--fg); padding: 8px 14px; }
@@ -30,15 +31,15 @@ p { margin-top: 8px; color: var(--dim); }
 </head>
 <body>
 <main>
-  <header><h1>CETyHb</h1><span class="dim">on-chain · <span id="net">…</span></span></header>
+  <header><h1>CETyHb</h1><span class="dim">fully on-chain · <span id="net">Ethereum</span></span></header>
 
   <section>
     <div class="stats">
       <span>MINTED <b id="minted">…</b> / <span id="max">111</span></span>
-      <span>PRICE <b id="price">…</b> ETH</span>
-      <span>SALE <b id="sale">…</b></span>
+      <span id="pricebox" hidden>PRICE <b id="price">…</b> ETH</span>
+      <span id="salebox" hidden>SALE <b id="sale">…</b></span>
     </div>
-    <div class="row">
+    <div class="row" id="mintrow" hidden>
       <button id="connect">[ CONNECT WALLET ]</button>
       <button id="mint" disabled>[ MINT ]</button>
       <span id="account" class="dim"></span>
@@ -52,16 +53,22 @@ p { margin-top: 8px; color: var(--dim); }
       <span id="tokname" class="dim">no tokens yet</span>
       <button id="next">[ &gt; ]</button>
     </div>
-    <div class="row" style="margin-top:6px"><span id="traits" class="dim"></span></div>
+    <div class="row" style="margin-top:6px">
+      <span id="traits" class="dim"></span>
+      <a id="buy" target="_blank" rel="noopener" hidden><button>[ BUY ON OPENSEA ]</button></a>
+      <button id="rand">[ RANDOM ]</button>
+    </div>
   </section>
   <section style="padding:0"><iframe id="view" class="viewer" sandbox="allow-scripts" title="token"></iframe></section>
 
   <section>
     <p>CETyHb is a long-form generative series inspired by Setun, the Soviet balanced-ternary computer
     built at Moscow State University in 1958. Each token is a terminal running a program in TRIT, a fictional
-    ternary language, on a triangular grid. Open the code, edit it and press RUN.</p>
-    <p>The artwork code, its interpreter and every token's hash are stored in the Ethereum contract itself:
-    no servers, no IPFS. This page is only a convenience; minting also works directly via Etherscan.</p>
+    ternary language, on a triangular grid. Open the code, edit it and press RUN; press "?" on interface
+    for syntax list and another info.</p>
+    <p>Fully on-chain: the artwork code, its interpreter and every token's hash are stored in the Ethereum
+    contract itself, with no servers and no IPFS. This page only reads the contract; every token is
+    available on OpenSea and directly on Etherscan.</p>
     <p><a id="etherscan" target="_blank" rel="noopener">contract on Etherscan</a> · <a id="opensea" target="_blank" rel="noopener">OpenSea</a></p>
   </section>
 </main>
@@ -104,7 +111,10 @@ async function refresh() {
   $('price').textContent  = fmtEth(price);
   $('sale').textContent   = supply >= maxSupply ? 'SOLD OUT' : saleOpen ? 'OPEN' : 'CLOSED';
   $('mint').disabled      = !account || !saleOpen || supply >= maxSupply;
-  if (shown < 0 && supply > 0) show(supply - 1);
+  // direct minting is optional: with the sale closed the page is a gallery that links to OpenSea
+  const minting = saleOpen && supply < maxSupply;
+  $('mintrow').hidden = $('pricebox').hidden = $('salebox').hidden = !minting;
+  if (shown < 0 && supply > 0) show(minting ? supply - 1 : 0);
 }
 
 async function show(id) {
@@ -117,7 +127,10 @@ async function show(id) {
   $('tokname').textContent = meta.name;
   $('traits').textContent  = meta.attributes.filter(a => a.trait_type !== 'hash').map(a => `${a.trait_type}: ${a.value}`).join(' · ');
   $('view').src = meta.animation_url;
-  if (C.opensea) $('opensea').href = `${C.opensea}/${C.contract}/${id}`;
+  if (C.opensea) {
+    $('opensea').href = $('buy').href = `${C.opensea}/${C.contract}/${id}`;
+    $('buy').hidden = false;
+  }
 }
 
 async function connect() {
@@ -140,8 +153,10 @@ async function mint() {
     $('mint').disabled = true;
     await refresh();
     status(`Confirm in your wallet: ${fmtEth(price)} ETH + gas…`);
-    const hash = await ethereum.request({ method: 'eth_sendTransaction',
-      params: [{ from: account, to: C.contract, data: SEL.mint, value: '0x' + price.toString(16) }] });
+    const tx  = { from: account, to: C.contract, data: SEL.mint, value: '0x' + price.toString(16) };
+    // gas depends a little on the block the mint lands in (the deck draw): add a 25% margin
+    const est = BigInt(await rpc('eth_estimateGas', [tx]));
+    const hash = await ethereum.request({ method: 'eth_sendTransaction', params: [{ ...tx, gas: '0x' + (est * 5n / 4n).toString(16) }] });
     status(`Minting… ${hash}`);
     let r = null;
     while (!r) { await new Promise(res => setTimeout(res, 3000)); r = await rpc('eth_getTransactionReceipt', [hash]); }
@@ -154,13 +169,14 @@ async function mint() {
   } catch (e) { status(e.message || String(e), true); await refresh().catch(() => {}); }
 }
 
-$('net').textContent = C.network;
+if (C.chainId !== 1) $('net').textContent = C.network;   // test networks say so
 if (C.etherscan) $('etherscan').href = `${C.etherscan}/address/${C.contract}`;
 if (C.opensea)   $('opensea').href   = `${C.opensea}/${C.contract}/0`;
 $('connect').onclick = connect;
 $('mint').onclick    = mint;
 $('prev').onclick    = () => show(shown - 1);
 $('next').onclick    = () => show(shown + 1);
+$('rand').onclick    = () => supply && show(Math.floor(Math.random() * supply));
 refresh().catch(e => status('Cannot read the contract: ' + e.message, true));
 setInterval(() => refresh().catch(() => {}), 20000);
 </script>

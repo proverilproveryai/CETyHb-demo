@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CETyHb</title>
+<style>html, body { margin: 0; background: #000; color: #FFB000; font: 16px ui-monospace, monospace; }</style>
+</head>
+<body>
+<p id="msg" style="padding:16px">loading from Ethereum…</p>
+<!-- Fallback viewer for animation_url (contract setAnimationBaseURI): reads the token's HTML
+     from the contract (tokenHTML) and shows it. view.html?id=<tokenId> -->
+<script src="config.js"></script>
+<script>
+(async () => {
+  const C  = window.CETYHB;
+  const id = Number(new URLSearchParams(location.search).get('id') ?? 0);
+  const data = '0xb79bebaf' + BigInt(id).toString(16).padStart(64, '0');   // tokenHTML(uint256)
+  try {
+    const r = await fetch(C.rpc, { method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'eth_call', params: [{ to: C.contract, data }, 'latest'] }) });
+    const j = await r.json();
+    if (j.error) throw new Error(j.error.message);
+    const b = j.result.slice(2), off = Number(BigInt('0x' + b.slice(0, 64))) * 2;
+    const len = Number(BigInt('0x' + b.slice(off, off + 64)));
+    const bytes = new Uint8Array(len);
+    for (let i = 0; i < len; i++) bytes[i] = parseInt(b.substr(off + 64 + i * 2, 2), 16);
+    document.open(); document.write(new TextDecoder().decode(bytes)); document.close();
+  } catch (e) { document.getElementById('msg').textContent = 'Cannot read the token: ' + e.message; }
+})();
+</script>
+</body>
+</html>
