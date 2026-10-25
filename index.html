@@ -69,7 +69,7 @@ p { margin-top: 8px; color: var(--dim); }
     <p>Fully on-chain: the artwork code, its interpreter and every token's hash are stored in the Ethereum
     contract itself, with no servers and no IPFS. This page only reads the contract; every token is
     available on OpenSea and directly on Etherscan.</p>
-    <p><a id="etherscan" target="_blank" rel="noopener">contract on Etherscan</a> · <a id="opensea" target="_blank" rel="noopener">OpenSea</a></p>
+    <p><a id="etherscan" target="_blank" rel="noopener">contract on Etherscan</a> · <a id="opensea" target="_blank" rel="noopener">collection on OpenSea</a></p>
   </section>
 </main>
 
@@ -128,7 +128,8 @@ async function show(id) {
   $('traits').textContent  = meta.attributes.filter(a => a.trait_type !== 'hash').map(a => `${a.trait_type}: ${a.value}`).join(' · ');
   $('view').src = meta.animation_url;
   if (C.opensea) {
-    $('opensea').href = $('buy').href = `${C.opensea}/${C.contract}/${id}`;
+    $('buy').href = `${C.opensea}/${C.contract}/${id}`;   // this token's page, to buy it
+    if (!C.openseaCollection) $('opensea').href = $('buy').href;
     $('buy').hidden = false;
   }
 }
@@ -171,7 +172,7 @@ async function mint() {
 
 if (C.chainId !== 1) $('net').textContent = C.network;   // test networks say so
 if (C.etherscan) $('etherscan').href = `${C.etherscan}/address/${C.contract}`;
-if (C.opensea)   $('opensea').href   = `${C.opensea}/${C.contract}/0`;
+if (C.openseaCollection || C.opensea) $('opensea').href = C.openseaCollection || `${C.opensea}/${C.contract}/0`;
 $('connect').onclick = connect;
 $('mint').onclick    = mint;
 $('prev').onclick    = () => show(shown - 1);
